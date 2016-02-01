@@ -34,33 +34,33 @@ module.exports = function(grunt) {
   // 1 to 1 gziping of files
   exports.gzip = function(files, done) {
     exports.singleFile(files, zlib.createGzip, 'gz', done);
-    grunt.log.ok('Compressed ' + chalk.cyan(files.length) + ' '
-      + grunt.util.pluralize(files.length, 'file/files.'));
   };
 
   // 1 to 1 deflate of files
   exports.deflate = function(files, done) {
     exports.singleFile(files, zlib.createDeflate, 'deflate', done);
-    grunt.log.ok('Compressed ' + chalk.cyan(files.length) + ' '
-      + grunt.util.pluralize(files.length, 'file/files.'));
   };
 
   // 1 to 1 deflateRaw of files
   exports.deflateRaw = function(files, done) {
     exports.singleFile(files, zlib.createDeflateRaw, 'deflate', done);
-    grunt.log.ok('Compressed ' + chalk.cyan(files.length) + ' '
-      + grunt.util.pluralize(files.length, 'file/files.'));
   };
 
   // 1 to 1 compression of files, expects a compatible zlib method to be passed in, see above
   exports.singleFile = function(files, algorithm, extension, done) {
     grunt.util.async.forEachSeries(files, function(filePair, nextPair) {
       grunt.util.async.forEachSeries(filePair.src, function(src, nextFile) {
+        var minSize = exports.options.minSize;
         // Must be a file
         if (grunt.file.isDir(src)) {
           return nextFile();
         }
-
+        var srcSize = parseInt(exports.getSize(src, false), 10);
+        if (srcSize < minSize) {
+          grunt.verbose.writeln('Skipped ' + chalk.cyan(src) + '(' + srcSize.toString() + ' bytes), minimum is ' + chalk.cyan(minSize.toString()) + ' bytes.');
+          done('skip');
+          return nextFile();
+        }
         // Ensure the dest folder exists
         grunt.file.mkdir(path.dirname(filePair.dest));
 
@@ -71,15 +71,23 @@ module.exports = function(grunt) {
         compressor.on('error', function(err) {
           grunt.log.error(err);
           grunt.fail.warn(algorithm + ' failed.');
+          done('skip');
           nextFile();
         });
 
         destStream.on('close', function() {
-          var originalSize = exports.getSize(src);
-          var compressedSize = exports.getSize(filePair.dest);
-          var ratio = Math.round(parseInt(compressedSize, 10) / parseInt(originalSize, 10) * 100) + '%';
-
-          grunt.verbose.writeln('Created ' + chalk.cyan(filePair.dest) + ' (' + compressedSize + ') - ' + chalk.cyan(ratio) + ' of the original size');
+          var originalSize = exports.getSize(src, false) || 1;
+          var compressedSize = exports.getSize(filePair.dest, false);
+          var ratio = Math.round(100 * compressedSize / originalSize) + '%';
+          var mode = 'gzip';
+          if (exports.options.ifSmaller && compressedSize >= originalSize) {
+            grunt.verbose.writeln('Skipped ' + chalk.cyan(filePair.src) + ' as compressed size: (' + compressedSize.toString() + ' bytes) is bigger than original ' + chalk.cyan(originalSize.toString()) + ' bytes.');
+            fs.unlink(filePair.dest);
+            mode = 'skip';
+          } else {
+            grunt.verbose.writeln('Created ' + chalk.cyan(filePair.dest) + ' (' + compressedSize.toString() + ' bytes) - ' + chalk.cyan(ratio) + ' of the original size.');
+          }
+          done(mode);
           nextFile();
         });
 
@@ -131,7 +139,7 @@ module.exports = function(grunt) {
     destStream.on('close', function() {
       var size = archive.pointer();
       grunt.verbose.writeln('Created ' + chalk.cyan(dest) + ' (' + exports.getSize(size) + ')');
-      done();
+      done('tar');
     });
 
     archive.pipe(destStream);
@@ -189,8 +197,6 @@ module.exports = function(grunt) {
       });
     });
 
-    grunt.log.ok('Compressed ' + chalk.cyan(files.length) + ' '
-      + grunt.util.pluralize(files.length, 'file/files.'));
     archive.finalize();
   };
 

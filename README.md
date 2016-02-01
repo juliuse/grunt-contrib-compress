@@ -41,12 +41,12 @@ If the type is a Function it must return a String.
 
 *This option is only appropriate for many-files-to-one compression modes like zip and tar.  For gzip for example, please use grunt's standard src/dest specifications.*
 
-#### mode
-Type: `String`
+#### ifSmaller
+Type: `Boolean`  
+Modes: `gzip`
+Default: `false`
 
-This is used to define which mode to use, currently supports `gzip`, `deflate`, `deflateRaw`, `tar`, `tgz` (tar gzip) and `zip`.
-
-Automatically detected per `dest:src` pair, but can be overridden per target if desired.
+When true, compress only files that would result in smaller size than uncompressed.
 
 #### level
 Type: `Integer`  
@@ -54,6 +54,22 @@ Modes: `zip` `gzip`
 Default: `1`
 
 Sets the level of archive compression.
+
+#### minSize
+Type: `Integer`  
+Modes: `gzip`
+Default: `0` (all files will be compressed)
+
+Compress only files with original size equal or greater than minSize.
+Recommended value: from 150 to 1000;  http://webmasters.stackexchange.com/questions/31750/what-is-recommended-minimum-object-size-for-gzip-performance-benefits
+To configure web servers accordingly; https://github.com/h5bp/server-configs.git
+
+#### mode
+Type: `String`
+
+This is used to define which mode to use, currently supports `gzip`, `deflate`, `deflateRaw`, `tar`, `tgz` (tar gzip) and `zip`.
+
+Automatically detected per `dest:src` pair, but can be overridden per target if desired.
 
 #### pretty
 Type: `Boolean`  
