@@ -14,6 +14,7 @@ var prettyBytes = require('pretty-bytes');
 var chalk = require('chalk');
 var zlib = require('zlib');
 var archiver = require('archiver');
+var streamBuffers = require('stream-buffers');
 
 module.exports = function(grunt) {
 
@@ -50,9 +51,10 @@ module.exports = function(grunt) {
   exports.singleFile = function(files, algorithm, extension, done) {
     grunt.util.async.forEachSeries(files, function(filePair, nextPair) {
       grunt.util.async.forEachSeries(filePair.src, function(src, nextFile) {
-        var minSize = exports.options.minSize;
+        var minSize = exports.options.minSize || 0;
         // Must be a file
         if (grunt.file.isDir(src)) {
+          done('dir');
           return nextFile();
         }
         var srcSize = parseInt(exports.getSize(src, false), 10);
@@ -71,7 +73,7 @@ module.exports = function(grunt) {
         compressor.on('error', function(err) {
           grunt.log.error(err);
           grunt.fail.warn(algorithm + ' failed.');
-          done('skip');
+          done('err');
           nextFile();
         });
 
@@ -112,7 +114,7 @@ module.exports = function(grunt) {
     var archive = archiver.create(mode, exports.options);
     var dest = exports.options.archive;
 
-    var dataWhitelist = ['comment', 'date', 'mode', 'store'];
+    var dataWhitelist = ['comment', 'date', 'mode', 'store', 'gid', 'uid'];
     var sourcePaths = {};
 
     // Ensure dest folder exists
@@ -158,7 +160,7 @@ module.exports = function(grunt) {
         var internalFileName = isExpandedPair ? file.dest : exports.unixifyPath(path.join(file.dest || '', srcFile));
 
         // check if internal file name is not a dot, should not be present in an archive
-        if (internalFileName === '.') {
+        if (internalFileName === '.' || internalFileName === './') {
           return;
         }
 
